@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard | BillSplitter</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+    <div class="nav-brand">💸 BillSplitter</div>
+    <div class="nav-links">
+        <a th:href="@{/dashboard}" class="active">Dashboard</a>
+        <a th:href="@{/conclude}">Conclude Day</a>
+        <a th:href="@{/history}">History</a>
+    </div>
+    <div class="nav-user">
+        <span>👤 <span th:text="${currentUser.displayName}">User</span></span>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-logout">Logout</button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="page-header">
+        <h2>Today's Expenses</h2>
+        <span class="date-badge" th:text="${#temporals.format(today, 'MMMM dd, yyyy')}">Date</span>
+    </div>
+
+    <!-- Alerts -->
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
+    <div th:if="${info}" class="alert alert-info" th:text="${info}"></div>
+    <div th:if="${todayConcluded}" class="alert alert-info">✅ Today's expenses have been concluded.</div>
+
+    <div class="grid-2">
+
+        <!-- LEFT: Post New Expense -->
+        <section class="card">
+            <h3 class="card-title">➕ Post New Expense</h3>
+            <form th:action="@{/expense/create}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+
+                <div class="form-group">
+                    <label>Description</label>
+                    <input type="text" name="description" required placeholder="e.g. Lunch at Pizza place"/>
+                </div>
+
+                <div class="form-group">
+                    <label>Amount (₹)</label>
+                    <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00"/>
+                </div>
+
+                <div class="form-group">
+                    <label>Split with (select all who share this expense)</label>
+                    <div class="checkbox-list">
+                        <div th:each="user : ${allUsers}" class="checkbox-item">
+                            <input type="checkbox" name="participantIds"
+                                   th:value="${user.id}"
+                                   th:id="'user-' + ${user.id}"
+                                   th:checked="${user.id == currentUser.id}"
+                            />
+                            <label th:for="'user-' + ${user.id}">
+                                <span th:text="${user.displayName}">Name</span>
+                                <span th:if="${user.id == currentUser.id}" class="badge-you">you</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-full">Post Expense</button>
+            </form>
+        </section>
+
+        <!-- RIGHT: Pending Approvals -->
+        <section class="card">
+            <h3 class="card-title">⏳ Pending Approvals (<span th:text="${pendingExpenses.size()}">0</span>)</h3>
+
+            <div th:if="${pendingExpenses.isEmpty()}" class="empty-state">
+                No pending expenses
+            </div>
+
+            <div th:each="expense : ${pendingExpenses}" class="expense-card pending">
+                <div class="expense-header">
+                    <span class="expense-desc" th:text="${expense.description}">Desc</span>
+                    <span class="expense-amount" th:text="'₹' + ${expense.amount}">₹0</span>
+                </div>
+                <div class="expense-meta">
+                    <span>Paid by: <strong th:text="${expense.paidBy.displayName}">Name</strong></span>
+                    <span>Split: <strong th:text="${expense.participants.size()} + ' people'">0</strong></span>
+                    <span class="approval-count"
+                          th:text="${expense.approvalCount} + '/3 approvals'">0/3</span>
+                </div>
+
+                <div class="expense-actions">
+                    <a th:href="@{/expense/{id}(id=${expense.id})}" class="btn btn-sm btn-outline">Details</a>
+
+                    <!-- Show vote buttons only if user hasn't voted and isn't the owner -->
+                    <span th:if="${!userApprovedExpenseIds.contains(expense.id) and expense.paidBy.id != currentUser.id}">
+                        <form th:action="@{/expense/{id}/approve(id=${expense.id})}" method="post" style="display:inline">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm btn-success">✓ Approve</button>
+                        </form>
+                        <form th:action="@{/expense/{id}/reject(id=${expense.id})}" method="post" style="display:inline">
+                            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                            <button type="submit" class="btn btn-sm btn-danger">✗ Reject</button>
+                        </form>
+                    </span>
+                    <span th:if="${userApprovedExpenseIds.contains(expense.id)}" class="voted-badge">✓ Voted</span>
+                    <span th:if="${expense.paidBy.id == currentUser.id}" class="voted-badge">Your expense</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Today's All Expenses Table -->
+    <section class="card mt-4">
+        <h3 class="card-title">📋 All of Today's Expenses</h3>
+
+        <div th:if="${todayExpenses.isEmpty()}" class="empty-state">
+            No expenses posted today yet.
+        </div>
+
+        <table th:if="${!todayExpenses.isEmpty()}" class="expense-table">
+            <thead>
+                <tr>
+                    <th>Description</th>
+                    <th>Amount</th>
+                    <th>Paid By</th>
+                    <th>Split Among</th>
+                    <th>Status</th>
+                    <th>Approvals</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="expense : ${todayExpenses}">
+                    <td th:text="${expense.description}">Desc</td>
+                    <td class="amount-cell" th:text="'₹' + ${expense.amount}">₹0</td>
+                    <td th:text="${expense.paidBy.displayName}">Name</td>
+                    <td>
+                        <span th:each="p, iter : ${expense.participants}">
+                            <span th:text="${p.displayName}">Name</span><span th:if="!${iter.last}">, </span>
+                        </span>
+                    </td>
+                    <td>
+                        <span th:class="'status-badge status-' + ${expense.status.name().toLowerCase()}"
+                              th:text="${expense.status}">STATUS</span>
+                    </td>
+                    <td th:text="${expense.approvalCount} + '/3'">0/3</td>
+                    <td><a th:href="@{/expense/{id}(id=${expense.id})}" class="btn btn-sm btn-outline">View</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <!-- Conclude Day Button -->
+    <div th:if="${hasApproved and !todayConcluded}" class="conclude-banner">
+        <p>You have approved expenses ready for settlement!</p>
+        <a th:href="@{/conclude}" class="btn btn-primary btn-lg">🏁 Conclude Today</a>
+    </div>
+
+</main>
+
+<script th:src="@{/js/app.js}"></script>
+</body>
+</html>

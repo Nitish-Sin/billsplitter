@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Expense Detail | BillSplitter</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="nav-brand">💸 BillSplitter</div>
+    <div class="nav-links">
+        <a th:href="@{/dashboard}">Dashboard</a>
+        <a th:href="@{/conclude}">Conclude Day</a>
+        <a th:href="@{/history}">History</a>
+    </div>
+    <div class="nav-user">
+        <span>👤 <span th:text="${currentUser.displayName}">User</span></span>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-logout">Logout</button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+    <a th:href="@{/dashboard}" class="back-link">← Back to Dashboard</a>
+
+    <div class="card expense-detail-card">
+        <div class="expense-detail-header">
+            <h2 th:text="${expense.description}">Expense</h2>
+            <span th:class="'status-badge status-' + ${expense.status.name().toLowerCase()}"
+                  th:text="${expense.status}">STATUS</span>
+        </div>
+
+        <div class="detail-grid">
+            <div class="detail-item">
+                <span class="detail-label">Amount</span>
+                <span class="detail-value big-amount" th:text="'₹' + ${expense.amount}">₹0</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Paid By</span>
+                <span class="detail-value" th:text="${expense.paidBy.displayName}">Name</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Date</span>
+                <span class="detail-value" th:text="${#temporals.format(expense.expenseDate, 'MMM dd, yyyy')}">Date</span>
+            </div>
+            <div class="detail-item">
+                <span class="detail-label">Per Person</span>
+                <span class="detail-value"
+                      th:text="'₹' + ${#numbers.formatDecimal(expense.amount / expense.participants.size(), 1, 2)}">₹0</span>
+            </div>
+        </div>
+
+        <div class="participants-section">
+            <h4>Split Among</h4>
+            <div class="participant-chips">
+                <span th:each="p : ${expense.participants}" class="chip" th:text="${p.displayName}">Name</span>
+            </div>
+        </div>
+
+        <!-- Approval Actions -->
+        <div th:if="${expense.status.name() == 'PENDING'}" class="approval-section">
+            <div class="approval-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill"
+                         th:style="'width: ' + ${(expense.approvalCount / 3.0) * 100} + '%'"></div>
+                </div>
+                <span th:text="${expense.approvalCount} + ' / 3 approvals'">0 / 3</span>
+            </div>
+
+            <div th:if="${!alreadyVoted and !isOwner}" class="vote-actions">
+                <h4>Cast Your Vote</h4>
+                <form th:action="@{/expense/{id}/approve(id=${expense.id})}" method="post">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div class="form-group">
+                        <label>Comment (optional)</label>
+                        <input type="text" name="comment" placeholder="Add a comment..."/>
+                    </div>
+                    <button type="submit" class="btn btn-success">✓ Approve this expense</button>
+                </form>
+                <form th:action="@{/expense/{id}/reject(id=${expense.id})}" method="post" style="margin-top:10px">
+                    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                    <div class="form-group">
+                        <label>Reason for rejection (optional)</label>
+                        <input type="text" name="comment" placeholder="Why are you rejecting?"/>
+                    </div>
+                    <button type="submit" class="btn btn-danger">✗ Reject this expense</button>
+                </form>
+            </div>
+
+            <div th:if="${alreadyVoted}" class="alert alert-info">You have already voted on this expense.</div>
+            <div th:if="${isOwner}" class="alert alert-info">You cannot vote on your own expense.</div>
+        </div>
+
+        <!-- Approvals Log -->
+        <div class="approvals-log">
+            <h4>Votes Log</h4>
+            <div th:if="${approvals.isEmpty()}" class="empty-state">No votes yet.</div>
+            <div th:each="approval : ${approvals}" class="approval-entry"
+                 th:class="'approval-entry ' + (${approval.action.name() == 'APPROVE'} ? 'approved' : 'rejected')">
+                <div class="approval-user">
+                    <strong th:text="${approval.approver.displayName}">Name</strong>
+                    <span th:class="'vote-icon ' + ${approval.action.name().toLowerCase()}"
+                          th:text="${approval.action.name() == 'APPROVE'} ? '✓ Approved' : '✗ Rejected'">Vote</span>
+                </div>
+                <div th:if="${approval.comment}" class="approval-comment" th:text="'&quot;' + ${approval.comment} + '&quot;'">Comment</div>
+                <div class="approval-time"
+                     th:text="${#temporals.format(approval.actionAt, 'MMM dd, HH:mm')}">Time</div>
+            </div>
+        </div>
+    </div>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Conclude Day | BillSplitter</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="nav-brand">💸 BillSplitter</div>
+    <div class="nav-links">
+        <a th:href="@{/dashboard}">Dashboard</a>
+        <a th:href="@{/conclude}" class="active">Conclude Day</a>
+        <a th:href="@{/history}">History</a>
+    </div>
+    <div class="nav-user">
+        <span>👤 <span th:text="${currentUser.displayName}">User</span></span>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-logout">Logout</button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="page-header">
+        <h2>🏁 Conclude Day</h2>
+        <span class="date-badge" th:text="${#temporals.format(today, 'MMMM dd, yyyy')}">Date</span>
+    </div>
+
+    <div th:if="${error}" class="alert alert-error" th:text="${error}"></div>
+
+    <!-- Already Concluded -->
+    <div th:if="${alreadyConcluded}" class="card">
+        <div class="alert alert-success">✅ Today's expenses have already been concluded!</div>
+        <a th:href="@{/history}" class="btn btn-outline">View Settlement History</a>
+    </div>
+
+    <!-- No approved expenses -->
+    <div th:if="${!alreadyConcluded and !hasApproved}" class="card">
+        <div class="empty-state">
+            <div style="font-size:3rem">🤷</div>
+            <p>No approved expenses to settle today.</p>
+            <p class="text-muted">Expenses need at least 3 approvals before they can be included.</p>
+            <a th:href="@{/dashboard}" class="btn btn-outline">Back to Dashboard</a>
+        </div>
+    </div>
+
+    <!-- Preview Settlement -->
+    <div th:if="${!alreadyConcluded and hasApproved}">
+        <section class="card">
+            <h3 class="card-title">📊 Settlement Preview</h3>
+            <p class="text-muted">Based on all approved expenses today. Only approved expenses are counted.</p>
+
+            <div th:if="${settlementPreview.isEmpty()}" class="empty-state">
+                All expenses are balanced — no payments needed!
+            </div>
+
+            <div th:if="${!settlementPreview.isEmpty()}" class="settlement-table-wrap">
+                <table class="expense-table">
+                    <thead>
+                        <tr>
+                            <th>Who Owes</th>
+                            <th>Pays To</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <th:block th:each="debtorEntry : ${settlementPreview}">
+                            <tr th:each="creditorEntry : ${debtorEntry.value}">
+                                <td>
+                                    <span th:class="${debtorEntry.key == currentUser.displayName} ? 'highlight-you' : ''"
+                                          th:text="${debtorEntry.key}">Debtor</span>
+                                    <span th:if="${debtorEntry.key == currentUser.displayName}" class="badge-you">YOU</span>
+                                </td>
+                                <td>
+                                    <span th:class="${creditorEntry.key == currentUser.displayName} ? 'highlight-you' : ''"
+                                          th:text="${creditorEntry.key}">Creditor</span>
+                                    <span th:if="${creditorEntry.key == currentUser.displayName}" class="badge-you">YOU</span>
+                                </td>
+                                <td class="amount-cell" th:text="'₹' + ${creditorEntry.value}">₹0</td>
+                            </tr>
+                        </th:block>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card">
+            <h3 class="card-title">⚠️ Confirm Day Conclusion</h3>
+            <p>This will finalize all approved expenses for today. This action <strong>cannot be undone</strong>.</p>
+            <form th:action="@{/conclude}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+                <button type="submit" class="btn btn-primary btn-lg"
+                        onclick="return confirm('Are you sure you want to conclude today? This cannot be undone.')">
+                    🏁 Conclude & Save Settlement
+                </button>
+                <a th:href="@{/dashboard}" class="btn btn-outline" style="margin-left:10px">Cancel</a>
+            </form>
+        </section>
+    </div>
+</main>
+
+</body>
+</html>

@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>History | BillSplitter</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}"/>
+</head>
+<body>
+
+<nav class="navbar">
+    <div class="nav-brand">💸 BillSplitter</div>
+    <div class="nav-links">
+        <a th:href="@{/dashboard}">Dashboard</a>
+        <a th:href="@{/conclude}">Conclude Day</a>
+        <a th:href="@{/history}" class="active">History</a>
+    </div>
+    <div class="nav-user">
+        <span>👤 <span th:text="${currentUser.displayName}">User</span></span>
+        <form th:action="@{/logout}" method="post" style="display:inline">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"/>
+            <button type="submit" class="btn-logout">Logout</button>
+        </form>
+    </div>
+</nav>
+
+<main class="main-content">
+    <div class="page-header">
+        <h2>📅 Settlement History</h2>
+    </div>
+
+    <div th:if="${settlements.isEmpty()}" class="card empty-state">
+        <div style="font-size:3rem">📭</div>
+        <p>No settlements yet. Conclude a day to see it here.</p>
+    </div>
+
+    <div class="card" th:if="${!settlements.isEmpty()}">
+        <table class="expense-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Concluded By</th>
+                    <th>Time</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr th:each="s : ${settlements}">
+                    <td th:text="${#temporals.format(s.settlementDate, 'MMM dd, yyyy')}">Date</td>
+                    <td th:text="${s.concludedBy.displayName}">Name</td>
+                    <td th:text="${#temporals.format(s.concludedAt, 'HH:mm')}">Time</td>
+                    <td><a th:href="@{/settlement/{id}(id=${s.id})}" class="btn btn-sm btn-outline">View Details</a></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</main>
+
+</body>
+</html>
